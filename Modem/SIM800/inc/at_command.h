@@ -14,10 +14,21 @@
 #include "dma.h"
 #include "FSM_Messages.h"
 
-#define	GSM_MODEM_HUART		huart4
-#define GSM_MODEM_DMA_RX	hdma_uart4_rx
-#define GSM_MODEM_DMA_TX	hdma_uart4_tx
-#define GSM_UART			UART4
+#define	GSM_MODEM_HUART			huart4
+#define GSM_MODEM_DMA_RX		hdma_uart4_rx
+#define GSM_MODEM_DMA_TX		hdma_uart4_tx
+#define GSM_UART				UART4
+#define GSM_RECEIVE_TIMEOUT		15 // 15 мс
+
+/*  Флаг необходимоти отправления/приема данных
+ *
+ */
+typedef enum
+{
+	NO_TX_RX = 0x00,
+	NEED_RX,
+	NEED_TX
+} usart_rx_tx_flag;
 
 /*  Флаг необходимоти включения прерывания по приему данных
  *
@@ -44,12 +55,13 @@ typedef struct
 	char* at_response;
 	uint32_t timeout;
 	usart_it_flag usart_need_it;
+	usart_rx_tx_flag usart_need_rx_tx;
 } at_command_data;
 
 extern char *answer_p; // Указатель на ответ в буффере
 
 at_command_data* fill_at_command_data (char* at_command, char* at_response, uint32_t timeout,
-										usart_it_flag usart_need_it);
+										usart_it_flag usart_need_it, usart_rx_tx_flag usart_need_rx_tx);
 
 void at_command_transmit_receive (at_command_data* at_command);
 

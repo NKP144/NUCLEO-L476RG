@@ -17,11 +17,7 @@
 
 typedef enum {
 	AT_SEND_IDLE_S				= 0x00,
-	AT_SEND_START_S,
-	AT_WAIT_ANSWER_S,
-	AT_RECEIVE_OK_S,
-	AT_RECEIVE_ERROR_S,
-	AT_NOT_RECEIVED_S
+	AT_WAIT_ANSWER_S
   } FSM_AT_SEND_STATE_e;
 
 typedef enum {

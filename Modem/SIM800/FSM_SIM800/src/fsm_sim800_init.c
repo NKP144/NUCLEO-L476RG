@@ -9,6 +9,7 @@
 #include "fsm_at_command_send.h"
 
 #include "stdlib.h"
+#include "string.h"
 
 FSM_SIM800_INIT_STATE_e FSM_SIM800_INIT_STATE;
 FSM_SIM800_INIT_STATE_e _FSM_SIM800_INIT_STATE;
@@ -17,7 +18,7 @@ FSM_SIM800_INIT_EVENTS_e FSM_SIM800_INIT_EVENT;
 
 static void start_SIM800_INIT_timer (void);
 static FSM_SIM800_INIT_EVENTS_e sim800_init_get_event (void);
-
+static void clear_rx_buf (void);
 
 /*
  *
@@ -42,36 +43,132 @@ void FSM_SIM800_Initialize (void)
 			{
 			case SIM800_IDLE_INIT_E:
 				break;
-			case SIM800_START_INIT_E: FSM_SIM800_INIT_STATE = SIM800_AT_SEND_S;
+			case SIM800_START_INIT_E: FSM_SIM800_INIT_STATE = SIM800_WAIT_RDY_S;
 									  _FSM_SIM800_INIT_STATE = SIM800_INIT_IDLE_S;
+									  SendFSM_Param_Messages(SEND_AT_COMMAND, fill_at_command_data ("", "RDY", RDY_TIMEOUT, NEED_TIMEOUT_IT , NEED_RX));
 				break;
 			}
 			break;
 
-		case SIM800_AT_SEND_S: ;    //at_command_data *const at_at_command = fill_at_command_data ("AT\r\n", "OK\r\n", 100);
-									/*at_at_command = (at_command_data *) calloc (1, sizeof(at_command_data));
-									at_at_command->at_command = "AT\r\n";
-									at_at_command->at_response = "OK\r\n";
-									at_at_command->timeout = 100;*/
-
-									SendFSM_Param_Messages(SEND_AT_COMMAND, fill_at_command_data ("AT\r\n", "\r\nOK\r\n", 50, NEED_TIMEOUT_IT));
-
-									FSM_SIM800_INIT_STATE = SIM800_WAIT_AT_ANSWER_S;
-									_FSM_SIM800_INIT_STATE = SIM800_AT_SEND_S;
-			break;
-
-		case SIM800_WAIT_AT_ANSWER_S:
+		case SIM800_WAIT_RDY_S:
 			switch (FSM_SIM800_INIT_EVENT)
 			{
-			case SIM800_IDLE_INIT_E: 			FSM_AT_SEND ();/*TODO Использовать вложенный автомат отправки/приема at-команды */
+			case SIM800_IDLE_INIT_E: 			FSM_AT_SEND ();
+							break;
+			case SIM800_AT_RECEIVE_OK_E:		FSM_SIM800_INIT_STATE = SIM800_WAIT_CLTS_S;
+												_FSM_SIM800_INIT_STATE = SIM800_WAIT_RDY_S;
+												clear_rx_buf ();
+												SendFSM_Param_Messages(SEND_AT_COMMAND, fill_at_command_data ("AT+CLTS=1\r\n", "OK", REGULAR_TIMEOUT, NEED_TIMEOUT_IT, NEED_TX | NEED_RX));
+							break;
+			case SIM800_AT_RECEIVE_TIMEOUT_E:   FSM_SIM800_INIT_STATE = SIM800_WAIT_AT_S;
+												_FSM_SIM800_INIT_STATE = SIM800_WAIT_RDY_S;
+												SendFSM_Param_Messages(SEND_AT_COMMAND, fill_at_command_data ("AT\r\n", "OK", REGULAR_TIMEOUT, NEED_TIMEOUT_IT, NEED_TX | NEED_RX));
+							break;
+			case SIM800_AT_RECEIVE_ERROR_E:		FSM_SIM800_INIT_STATE = SIM800_INIT_ERROR_S;
+												_FSM_SIM800_INIT_STATE = SIM800_WAIT_RDY_S;
+							break;
+			}
+			break;
+
+
+		case SIM800_WAIT_AT_S:
+			switch (FSM_SIM800_INIT_EVENT)
+			{
+			case SIM800_IDLE_INIT_E: 			FSM_AT_SEND ();
 				break;
-			case SIM800_AT_RECEIVE_OK_E:
+			case SIM800_AT_RECEIVE_OK_E:		FSM_SIM800_INIT_STATE = SIM800_WAIT_IPR_S;
+												_FSM_SIM800_INIT_STATE = SIM800_WAIT_AT_S;
+												clear_rx_buf();
+												SendFSM_Param_Messages(SEND_AT_COMMAND, fill_at_command_data ("AT+IPR=115200\r\n", "OK", REGULAR_TIMEOUT, NEED_TIMEOUT_IT, NEED_TX | NEED_RX));
 				break;
-			case SIM800_AT_RECEIVE_TIMEOUT_E:
+			case SIM800_AT_RECEIVE_TIMEOUT_E:   FSM_SIM800_INIT_STATE = SIM800_INIT_ERROR_S;
+												_FSM_SIM800_INIT_STATE = SIM800_WAIT_AT_S;
 				break;
-			case SIM800_AT_RECEIVE_ERROR_E:
+			case SIM800_AT_RECEIVE_ERROR_E: 	FSM_SIM800_INIT_STATE = SIM800_INIT_ERROR_S;
+												_FSM_SIM800_INIT_STATE = SIM800_WAIT_AT_S;
 				break;
 			}
+			break;
+
+		case SIM800_WAIT_IPR_S:
+			switch (FSM_SIM800_INIT_EVENT)
+			{
+			case SIM800_IDLE_INIT_E: 			FSM_AT_SEND ();
+				break;
+			case SIM800_AT_RECEIVE_OK_E:		FSM_SIM800_INIT_STATE = SIM800_WAIT_W_S;
+												_FSM_SIM800_INIT_STATE = SIM800_WAIT_IPR_S;
+												clear_rx_buf();
+												SendFSM_Param_Messages(SEND_AT_COMMAND, fill_at_command_data ("AT&W\r\n", "OK", ATW_TIMEOUT, NEED_TIMEOUT_IT, NEED_TX | NEED_RX));
+				break;
+			case SIM800_AT_RECEIVE_TIMEOUT_E:	FSM_SIM800_INIT_STATE = SIM800_INIT_ERROR_S;
+												_FSM_SIM800_INIT_STATE = SIM800_WAIT_IPR_S;
+				break;
+			case SIM800_AT_RECEIVE_ERROR_E:		FSM_SIM800_INIT_STATE = SIM800_INIT_ERROR_S;
+												_FSM_SIM800_INIT_STATE = SIM800_WAIT_IPR_S;
+				break;
+			}
+
+			break;
+
+		case SIM800_WAIT_W_S:
+			switch (FSM_SIM800_INIT_EVENT)
+			{
+			case SIM800_IDLE_INIT_E: 			FSM_AT_SEND ();
+				break;
+			case SIM800_AT_RECEIVE_OK_E:		FSM_SIM800_INIT_STATE = SIM800_WAIT_CLTS_S;
+												_FSM_SIM800_INIT_STATE = SIM800_WAIT_W_S;
+												clear_rx_buf();
+												SendFSM_Param_Messages(SEND_AT_COMMAND, fill_at_command_data ("AT+CLTS=1\r\n", "OK", REGULAR_TIMEOUT, NEED_TIMEOUT_IT, NEED_TX | NEED_RX));
+				break;
+			case SIM800_AT_RECEIVE_TIMEOUT_E:	FSM_SIM800_INIT_STATE = SIM800_INIT_ERROR_S;
+												_FSM_SIM800_INIT_STATE = SIM800_WAIT_W_S;
+				break;
+			case SIM800_AT_RECEIVE_ERROR_E:		FSM_SIM800_INIT_STATE = SIM800_INIT_ERROR_S;
+												_FSM_SIM800_INIT_STATE = SIM800_WAIT_W_S;
+				break;
+			}
+			break;
+
+		case SIM800_WAIT_CLTS_S:
+			switch (FSM_SIM800_INIT_EVENT)
+			{
+			case SIM800_IDLE_INIT_E: 			FSM_AT_SEND ();
+				break;
+			case SIM800_AT_RECEIVE_OK_E:		FSM_SIM800_INIT_STATE = SIM800_WAIT_SMS_READY_S;
+												_FSM_SIM800_INIT_STATE = SIM800_WAIT_CLTS_S;
+												clear_rx_buf();
+												SendFSM_Param_Messages(SEND_AT_COMMAND, fill_at_command_data ("", "SMS Ready", SMS_READY_TIMEOUT, NEED_TIMEOUT_IT, NEED_RX));
+				break;
+			case SIM800_AT_RECEIVE_TIMEOUT_E:	FSM_SIM800_INIT_STATE = SIM800_INIT_ERROR_S;
+												_FSM_SIM800_INIT_STATE = SIM800_WAIT_CLTS_S;
+				break;
+			case SIM800_AT_RECEIVE_ERROR_E:		FSM_SIM800_INIT_STATE = SIM800_INIT_ERROR_S;
+												_FSM_SIM800_INIT_STATE = SIM800_WAIT_CLTS_S;
+				break;
+			}
+			break;
+
+		case SIM800_WAIT_SMS_READY_S:
+			switch (FSM_SIM800_INIT_EVENT)
+			{
+			case SIM800_IDLE_INIT_E: 			FSM_AT_SEND ();
+				break;
+			case SIM800_AT_RECEIVE_OK_E:		FSM_SIM800_INIT_STATE = SIM800_INIT_FINISH_S;
+												_FSM_SIM800_INIT_STATE = SIM800_WAIT_SMS_READY_S;
+												clear_rx_buf();
+				break;
+			case SIM800_AT_RECEIVE_TIMEOUT_E:	FSM_SIM800_INIT_STATE = SIM800_INIT_ERROR_S;
+												_FSM_SIM800_INIT_STATE = SIM800_WAIT_SMS_READY_S;
+				break;
+			case SIM800_AT_RECEIVE_ERROR_E:		FSM_SIM800_INIT_STATE = SIM800_INIT_ERROR_S;
+												_FSM_SIM800_INIT_STATE = SIM800_WAIT_SMS_READY_S;
+				break;
+			}
+			break;
+
+		case SIM800_INIT_ERROR_S:	SendFSM_Messages (SIM800_INIT_ERROR);
+									FSM_SIM800_INIT_STATE = SIM800_INIT_IDLE_S;
+									_FSM_SIM800_INIT_STATE = SIM800_INIT_ERROR_S;
 			break;
 
 		case SIM800_INIT_FINISH_S:	SendFSM_Messages (SIM800_INIT_FINISH);
@@ -93,15 +190,19 @@ static FSM_SIM800_INIT_EVENTS_e sim800_init_get_event (void)
 	{
 	 result = SIM800_START_INIT_E;
 	}
-	/* else if (GetFSM_Messages(BUZZER_START_5_SEC))
+	else if (GetFSM_Broadcast_Messages(AT_COMMAND_OK))
 	{
-	 result = BUZZER_START_5SEC;
+	 result = SIM800_AT_RECEIVE_OK_E;
 	}
-	else if (GetFSM_Messages(BUZZER_STOP_MES))
+	else if (GetFSM_Broadcast_Messages(AT_COMMAND_ERROR))
 	{
-	result = BUZZER_STOP;
+	result = SIM800_AT_RECEIVE_ERROR_E;
 	}
-	else result = BUZZER_IDLE;*/
+	else if (GetFSM_Broadcast_Messages(AT_COMMANT_NO_ANSWER))
+	{
+	result = SIM800_AT_RECEIVE_TIMEOUT_E;
+	}
+	/*else result = BUZZER_IDLE;*/
 
 	return result;
 }
@@ -117,3 +218,11 @@ static void start_SIM800_INIT_timer (void)
  		_FSM_SIM800_INIT_STATE = FSM_SIM800_INIT_STATE;
  	}
  }
+
+/*
+ *
+ */
+static void clear_rx_buf (void)
+{
+	memset (modem_rx_buf, '\0', uart_rx_counter);
+}

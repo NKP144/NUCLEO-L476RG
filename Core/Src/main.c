@@ -31,6 +31,7 @@
 
 #include "fsm_power_on.h"
 #include "fsm_sim800_init.h"
+#include "fsm_wait_network_registration.h"
 #include "FSM_Messages.h"
 #include "FSM_Timers.h"
 /* USER CODE END Includes */
@@ -106,6 +107,7 @@ int main(void)
   SendFSM_Messages (SIM800_RESET_BEGIN);
 
   FSM_SIM800_Power_on_init();
+  FSM_wait_net_reg_init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -120,6 +122,7 @@ int main(void)
 	  HAL_Delay(250);*/
 	  FSM_SIM800_Power_on();
 	  FSM_SIM800_Initialize();
+	  FSM_wait_net_reg();
 
 	  ProcessFSM_Messages ();
   }

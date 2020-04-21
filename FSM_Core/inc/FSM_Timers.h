@@ -26,7 +26,7 @@
 
 typedef enum {
  	SIM800_TIMER			= 0x00,
-	AT_COMMAND_TIMER
+	AT_COMMAND_TIMER,
  } FSM_timer_id_e;
 
 /*  Инициализация таймеров, инициализация аппаратного таймера

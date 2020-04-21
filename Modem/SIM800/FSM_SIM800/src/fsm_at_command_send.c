@@ -8,6 +8,7 @@
 #include "fsm_at_command_send.h"
 #include "stdlib.h"
 #include "stdio.h"
+#include "string.h"
 
 FSM_AT_SEND_STATE_e FSM_AT_SEND_STATE;
 FSM_AT_SEND_STATE_e _FSM_AT_SEND_STATE;
@@ -46,75 +47,95 @@ void FSM_AT_SEND (void)
 			{
 			case AT_SEND_IDLE_E:
 				break;
-			case AT_SEND_BEGIN_E: FSM_AT_SEND_STATE = AT_SEND_START_S;
+			case AT_SEND_BEGIN_E: FSM_AT_SEND_STATE = AT_WAIT_ANSWER_S;
 								  _FSM_AT_SEND_STATE = AT_SEND_IDLE_S;
+								  Show_Message_in_Debug ("\r\n#################\r\n", strlen("\r\n#################\r\n"));
+								  Show_Message_in_Debug ("START UART\r\n", strlen("START UART\r\n"));
+								  at_command_transmit_receive (&at_command);
+								  start_AT_SEND_timer ();
 				break;
 			}
-			break;
-
-		case AT_SEND_START_S: at_command_transmit_receive (&at_command);
-							  FSM_AT_SEND_STATE = AT_WAIT_ANSWER_S;
-							  _FSM_AT_SEND_STATE = AT_SEND_START_S;
 			break;
 
 		case AT_WAIT_ANSWER_S:
 			switch (FSM_AT_SEND_EVENT)
 			{
-			case AT_SEND_IDLE_E:
+			case AT_SEND_IDLE_E:      if (GetFSM_Timer(AT_COMMAND_TIMER) >= (at_command.timeout / 10))  // timeout в мс / 10 мс (период работы аппаратного таймера)
+	  	  							  {
+										// вышел тайм - аут, ничего не принято
+							   	   	   	   	fsm_go_idle_state ();
+							   	   	   	   	SendFSM_Broadcast_Messages (AT_COMMANT_NO_ANSWER);
+							   	   	   	   	Show_Message_in_Debug ("\r\n------------------\r\n", strlen("\r\n------------------\r\n"));
+				   	   	   	   	  			Show_Message_in_Debug ("TIMEOUT NO ANSWER\r\n", strlen("TIMEOUT NO ANSWER\r\n"));
+
+				   	   	   	   	  			Show_Message_in_Debug ("\r\n!!!!!!!!!!!!!!!!!!\r\n", strlen("\r\n!!!!!!!!!!!!!!!!!!\r\n"));
+				   	   	   	   				Show_Message_in_Debug ("STOP UART\r\n", strlen("START UART\r\n"));
+	  	  							  }
 				break;
-			case AT_RECEIVE_IDLE_E:    answer_p = NULL;
+			case AT_RECEIVE_IDLE_E:    answer_p = NULL;  // СООБЩЕНИЕ ПОЛУЧЕНО
 									   if (at_compare_answer(modem_rx_buf,at_command.at_response, &answer_p) == AT_OK) // Совпало, выключить прерывания, завершить работу
 									   {
-										FSM_AT_SEND_STATE = AT_RECEIVE_OK_S;
-										_FSM_AT_SEND_STATE = AT_WAIT_ANSWER_S;
-										printf ("IDLE RESPONSE OK \r\n");
+										fsm_go_idle_state ();
+										SendFSM_Broadcast_Messages (AT_COMMAND_OK);
+										Show_Message_in_Debug ("\r\n------------------\r\n", strlen("\r\n------------------\r\n"));
+										Show_Message_in_Debug ("IDLE RESPONSE OK\r\n", strlen("IDLE RESPONSE OK\r\n"));
+										Show_Message_in_Debug (answer_p, strlen(answer_p));
+
+										Show_Message_in_Debug ("\r\n!!!!!!!!!!!!!!!!!!\r\n", strlen("\r\n!!!!!!!!!!!!!!!!!!\r\n"));
+										Show_Message_in_Debug ("STOP UART\r\n", strlen("START UART\r\n"));
 									   }
 									   else if (at_compare_answer(modem_rx_buf,"ERROR", &answer_p) == AT_OK)  // Если не совпало, проверить на ошибку
 									   {
-										   FSM_AT_SEND_STATE = AT_RECEIVE_ERROR_S;
-										   _FSM_AT_SEND_STATE = AT_WAIT_ANSWER_S;
-										printf ("IDLE RESPONSE ERROR \r\n");
+										 fsm_go_idle_state ();
+										 SendFSM_Broadcast_Messages (AT_COMMAND_ERROR);
+										 Show_Message_in_Debug ("\r\n------------------\r\n", strlen("\r\n------------------\r\n"));
+										 Show_Message_in_Debug ("IDLE RESPONSE ERROR\r\n", strlen("IDLE RESPONSE ERROR\r\n"));
+										 Show_Message_in_Debug (answer_p, strlen(answer_p));
+
+										 Show_Message_in_Debug ("\r\n!!!!!!!!!!!!!!!!!!\r\n", strlen("\r\n!!!!!!!!!!!!!!!!!!\r\n"));
+										 Show_Message_in_Debug ("STOP UART\r\n", strlen("START UART\r\n"));
 									   }
-									   else // Не ошибка, пришло что-то другое ждать дальше пока не сработает receive timeout
+									   else // Не ошибка, пришло что-то другое ждать дальше
 									   {
-										printf ("IDLE NOT RESPONSE, WAIT \r\n");
+										Show_Message_in_Debug ("\r\n------------------\r\n", strlen("\r\n------------------\r\n"));
+										Show_Message_in_Debug ("IDLE NOT RESPONSE, WAIT\r\n", strlen("IDLE NOT RESPONSE, WAIT\r\n"));
+										Show_Message_in_Debug (modem_rx_buf, strlen(modem_rx_buf));
 									   }
 				break;
-			case AT_RECEIVE_TIMEOUT_E: answer_p = NULL;
+			case AT_RECEIVE_TIMEOUT_E: answer_p = NULL;	// СООБЩЕНИЕ ПОЛУЧЕНО
 			   	   	   	   	   	   	   if (at_compare_answer(modem_rx_buf,at_command.at_response, &answer_p) == AT_OK) // Совпало, выключить прерывания, завершить работу
 			   	   	   	   	   	   	   {
-			   	   	   	   	   	   		  FSM_AT_SEND_STATE = AT_RECEIVE_OK_S;
-			   	   	   	   	   	   		  _FSM_AT_SEND_STATE = AT_WAIT_ANSWER_S;
-			   	   	   	   	   	   		  printf ("TIMEOUT RESPONSE OK \r\n");
+			   	   	   	   	   	   		  fsm_go_idle_state ();
+			   	   	   	   	   	   		  SendFSM_Broadcast_Messages (AT_COMMAND_OK);
+			   	   	   	   	   	   		  Show_Message_in_Debug ("\r\n------------------\r\n", strlen("\r\n------------------\r\n"));
+			   	   	   	   	   	   		  Show_Message_in_Debug ("TIMEOUT RESPONSE OK\r\n", strlen("\r\nTIMEOUT RESPONSE OK\r\n"));
+			   	   	   	   	  			  Show_Message_in_Debug (answer_p, strlen(answer_p));
+
+			   	   	   	   	  			  Show_Message_in_Debug ("\r\n!!!!!!!!!!!!!!!!!!\r\n", strlen("\r\n!!!!!!!!!!!!!!!!!!\r\n"));
+			   	   	   	   	  			  Show_Message_in_Debug ("STOP UART\r\n", strlen("START UART\r\n"));
 			   	   	   	   	   	   	   }
 			   	   	   	   	   	   	   else if (at_compare_answer(modem_rx_buf,"ERROR", &answer_p) == AT_OK) // Если не совпало, проверить на ошибку
 			   	   	   	   	   	   	   {
-			   	   	   	   	   	   		   FSM_AT_SEND_STATE = AT_RECEIVE_ERROR_S;
-			   	   	   	   	   			   _FSM_AT_SEND_STATE = AT_WAIT_ANSWER_S;
-			   	   	   	   	   			  printf ("TIMEOUT RESPONSE ERROR \r\n");
+			   	   	   	   	   			  fsm_go_idle_state ();
+			   	   	   	   	   			  SendFSM_Broadcast_Messages (AT_COMMAND_ERROR);
+
+			   	   	   	   	   			  Show_Message_in_Debug ("\r\n------------------\r\n", strlen("\r\n------------------\r\n"));
+			   	   	   	   	   			  Show_Message_in_Debug ("TIMEOUT RESPONSE ERROR\r\n", strlen("\r\nTIMEOUT RESPONSE ERROR\r\n"));
+			   	   	   	   	   			  Show_Message_in_Debug (answer_p, strlen(answer_p));
+
+			   	   	   	   	   			  Show_Message_in_Debug ("\r\n!!!!!!!!!!!!!!!!!!\r\n", strlen("\r\n!!!!!!!!!!!!!!!!!!\r\n"));
+			   	   	   	   	 			  Show_Message_in_Debug ("STOP UART\r\n", strlen("START UART\r\n"));
 			   	   	   	   	   	   	   }
-			   	   	   	   	   	   	   else // Не ошибка, ответ не пришёл вовремя
+			   	   	   	   	   	   	   else // Не ошибка, пришло что-то другое ждать дальше
 			   	   	   	   	   	   	   {
-			   	   	   	   	   	   		   FSM_AT_SEND_STATE = AT_NOT_RECEIVED_S;
-			   	   	   	   	  			   _FSM_AT_SEND_STATE = AT_WAIT_ANSWER_S;
-			   	   	   	   	  			   printf ("TIMEOUT NO ANSWER \r\n");
+			   	   	   	   	   	   		   //at_restart_dma_rx();
+			   	   	   	   	   	   		   Show_Message_in_Debug ("\r\n------------------\r\n", strlen("\r\n------------------\r\n"));
+			   	   	   	   	  			   Show_Message_in_Debug ("TIMEOUT NOT RESPONSE\r\n", strlen("\r\nTIMEOUT NOT RESPONSE\r\n"));
+			   	   	   	   	  			   Show_Message_in_Debug (modem_rx_buf, strlen(modem_rx_buf));
 			   	   	   	   	   	   	   }
 			   	break;
 			}
 			break;
-
-		case AT_RECEIVE_OK_S:		fsm_go_idle_state ();
-									SendFSM_Messages (AT_COMMAND_OK);
-			break;
-
-		case AT_RECEIVE_ERROR_S:	fsm_go_idle_state ();
-									SendFSM_Messages (AT_COMMAND_ERROR);
-			break;
-
-		case AT_NOT_RECEIVED_S:		fsm_go_idle_state ();
-									SendFSM_Messages (AT_COMMANT_NO_ANSWER);
-			break;
-
 		}
 }
 
@@ -131,6 +152,7 @@ static FSM_AT_SEND_EVENTS_e at_send_get_event (void)
 	 at_command.at_response = at_command_p->at_response;
 	 at_command.timeout = at_command_p->timeout;
 	 at_command.usart_need_it = at_command_p->usart_need_it;
+	 at_command.usart_need_rx_tx = at_command_p->usart_need_rx_tx;
 	 free (at_command_p);
 
 	 result = AT_SEND_BEGIN_E;
@@ -161,7 +183,7 @@ static void fsm_go_idle_state (void)
 {
 	at_uart_work_finish ();
 	FSM_AT_SEND_STATE = AT_SEND_IDLE_S;
-	_FSM_AT_SEND_STATE = AT_RECEIVE_OK_S;
+	_FSM_AT_SEND_STATE = AT_WAIT_ANSWER_S;
 }
 
 

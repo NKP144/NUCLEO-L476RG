@@ -158,3 +158,16 @@ void ProcessFSM_Messages (void)
 		}
 	 }
 }
+
+/*  Отправка сообщения через printf в SWD Console
+ *  Установить #DEBUG
+ *  Отправка сообщения через технологический протоколо
+ *  Установить #TECH_PROT_DEBUG
+ *
+ */
+void Show_Message_in_Debug (char *message, int lenth)
+{
+#ifdef DEBUG
+	printf (message);
+#endif
+}

@@ -40,7 +40,7 @@ void FSM_SIM800_Power_on (void)
 	case SIM800_POWER_ON_INIT:
 		switch (FSM_SIM800_Power_on_EVENT)
 		{
-		case SIM800_POWER_IDLE:
+		case SIM800_POWER_IDLE:  mdm_rst_hi ();
 			break;
 		case SIM800_BEGIN_RESET: FSM_SIM800_Power_on_STATE = SIM800_START_RESET;
 							     _FSM_SIM800_Power_on_STATE = SIM800_POWER_ON_INIT;

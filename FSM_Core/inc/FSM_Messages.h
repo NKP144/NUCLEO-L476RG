@@ -14,6 +14,7 @@
 
  /* Includes ------------------------------------------------------------------*/
 #include "stm32l4xx_hal.h"
+#include "stdio.h"
 
 #define MAX_MESSAGES 			64
 #define MAX_BROADCAST_MESSAGES	16
@@ -36,13 +37,15 @@ typedef enum {
 	SIM800_RESET_FINISH,
 	SIM800_INIT_BEGIN,
 	SIM800_INIT_FINISH,
+	SIM800_INIT_ERROR,
 	SEND_AT_COMMAND,
 	AT_COMMAND_OK,
 	AT_COMMAND_ERROR,
 	AT_COMMANT_NO_ANSWER,
 	SIM800_UART_IDLE_IT,
 	SIM800_UART_TIMEOUT_IT,
-
+	NET_REGISRATION_OK,
+	NET_REGISRATION_ERROR
  } FSM_messages_id_e;
 
  /* Параметры для передачи в сообщении для FSM_LED
@@ -91,6 +94,11 @@ typedef enum {
   *
   */
  void ProcessFSM_Messages (void);
+
+ /*
+  *
+  */
+void Show_Message_in_Debug (char *message, int lenth);
 
 #ifdef __cplusplus
 }
